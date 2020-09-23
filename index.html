@@ -1,0 +1,305 @@
+<!doctype html>
+<html>
+	<head>
+		<title>
+			Stereograms
+		</title>
+        <script src="https://epicenterprograms.github.io/standards/behavior/general.js"></script>
+        <script src="https://epicenterprograms.github.io/standards/behavior/game.js"></script>
+		<!--
+        <script src="file:///C:/Users/rtben/Documents/GitHub/standards/behavior/general.js"></script>
+        <script src="file:///C:/Users/rtben/Documents/GitHub/standards/behavior/game.js"></script>
+		-->
+		<script>
+			var S = Standards.general;
+			var G = Standards.game;
+			G.refreshInterval = 100;
+			G.lengthUnit = "px";
+
+
+			function shadeToDepth(shade) {
+                if (S.getType(shade) == "Uint8ClampedArray" || S.getType(shade) == "Array") {
+					return Math.round((735 - (shade[0] + shade[1] + shade[2])) / 735 * 5);
+				} else {  // if a number from 0 to 735
+                    return Math.round((735 - shade) / 735 * 5);
+                }
+            }
+
+			function objectsToDepthMap(objects, repeat, options) {
+				options = options || {};
+				let width = options.canvasWidth ? options.canvasWidth : 350;
+				let height = options.canvasHeight ? options.canvasHeight : 300;
+				let x = 0;
+				let y = 0;
+				let depthMap = [];
+
+				while (y < height) {
+					depthMap.push([]);
+					x = 0;
+					while (x < width + repeat * 2) {
+						depthMap[y].push(5);
+						x++;
+					}
+					y++;
+				}
+
+				let index = 0;
+				while (index < objects.length) {
+					switch (objects[index].shape) {
+						case "square":
+							let startingX = Math.max(objects[index].coords.x + repeat - objects[index].width / 2, repeat);
+                            let endingX = Math.min(objects[index].coords.x + repeat + objects[index].width / 2, width);
+							y = Math.max(objects[index].coords.y - objects[index].height / 2, 0);
+							let endingY = Math.min(objects[index].coords.y + objects[index].height / 2, height);
+                            while (y < endingY) {
+                                x = startingX;
+								while (x < endingX) {
+                                    depthMap[y][x] = 1;
+									x++;
+								}
+								y++;
+                            }
+							break;
+						case "circle":
+							break;
+                    }
+					index++;
+				}
+
+				return depthMap;
+            }
+
+            function imageToDepthMap(depthImage, repeat) {
+                // let depthImage = document.createElement("canvas");
+                depthImage = S.getId("depthMap");
+                depthImage.width = 350;
+                depthImage.height = 300;
+                depthImage.style.background = "black";
+                let depthContext = depthImage.getContext("2d");
+                depthContext.fillStyle = "white";
+                depthContext.fillRect(1, 125, 50, 50);
+                depthContext.beginPath();
+                depthContext.arc(175, 150, 25, 0, Math.PI * 2, true);  // center x, center y, radius, start angle, end angle, clockwise or counterclockwise
+				depthContext.fill();
+
+                let depthMap = [];
+                y = 0;
+                while (y < depthImage.height) {  //// takes the longest by far
+                    depthMap.push([]);
+                    let padding = 0;
+                    let firstPixel = depthContext.getImageData(0, y, 1, 1).data;
+					firstPixel = shadeToDepth(firstPixel);
+                    while (padding < repeat) {
+                        depthMap[y].push(firstPixel);
+                        padding++;
+                    }
+                    let x = 0;
+                    while (x < depthImage.width) {
+                        depthMap[y].push(shadeToDepth(depthContext.getImageData(x, y, 1, 1).data));
+                        x++;
+                    }
+                    padding = 0;
+                    x--;
+                    while (padding < repeat) {
+                        depthMap[y].push(depthMap[y][x]);
+                        padding++;
+                    }
+                    y++;
+				}
+
+				return depthMap;
+            }
+
+			function createStereogram(depthImage, repeat) {
+				repeat = repeat || 75;
+
+				let depthMap;
+				if (S.getType(depthImage) == "Array") {
+					depthMap = objectsToDepthMap(depthImage, repeat);
+				} else {
+					depthMap = imageToDepthMap(depthImage, repeat);
+                }
+
+				let canvas = S.getTag("canvas")[0];
+				let context = canvas.getContext("2d");
+                canvas.width = depthMap[0].length;
+				canvas.height = depthMap.length;
+				/*
+				context.fillStyle = "white";
+                context.fillRect(0, 0, canvas.width, canvas.height);
+				context.fillStyle = "black";
+				*/
+				context.clearRect(0, 0, canvas.width, canvas.height);  // clears the canvas
+
+				let sourcePattern = [];
+				let y = 0;
+				while (y < depthMap.length) {
+					sourcePattern.push([]);
+					let x = 0;
+					while (x < repeat) {
+						sourcePattern[y].push(Math.round(Math.random()));
+						x++;
+					}
+					y++;
+                }
+
+				context.beginPath();
+				y = 0;
+				while (y < depthMap.length) {
+					let row = depthMap[y];
+                    let currentDepth = row[0];
+					let position = 0;
+                    let currentPattern = sourcePattern[y % sourcePattern.length].slice();
+
+					let x = 0;
+					while (x < row.length) {
+						let depth = row[x];
+						if (depth < currentDepth) {
+							currentPattern.splice(position, currentDepth - depth);
+							//// currentPattern = currentPattern.slice(0, position).concat(currentPattern.slice(position + currentDepth - depth));
+						} else if (depth > currentDepth) {
+							let index = 0;
+							while (index < depth - currentDepth) {
+								currentPattern.splice(position, 0, Math.round(Math.random()));
+								//// currentPattern = currentPattern.slice(0, position).concat(Math.round(Math.random()), currentPattern.slice(position));
+								index++;
+							}
+						}
+						currentDepth = depth;
+						if (currentPattern[position] == 1) {
+							/*
+							switch (Math.round(Math.random() * 3)) {
+								case 0:
+									context.fillStyle = "black";
+									break;
+								case 1:
+									context.fillStyle = "red";
+									break;
+								case 2:
+									context.fillStyle = "green";
+									break;
+								case 3:
+									context.fillStyle = "blue";
+									break;
+                            }
+							*/
+							context.rect(x, y, 1, 1);
+						}
+						position++;
+						if (position >= currentPattern.length) {
+							position = 0;
+						}
+						x++;
+					}
+					y++;
+				}
+				context.fill();
+			}
+
+            S.listen("createStereogram", "click", function () {
+                let time = performance.now();
+				S.forEach(50, function () {
+					setTimeout(function () {
+						createStereogram([
+							{ shape: "square", coords: { x: 175, y: 150 }, width: 50, height: 50 }
+						]);
+						console.log(performance.now() - time);
+					}, 0);
+				});
+			});
+
+
+			S.onLoad(function () {
+				/*
+				let img = S.getId("depth map.jpg");
+				let depthMap = document.createElement("canvas");
+				depthMap.width = img.width;
+				depthMap.height = img.height;
+				depthMap.getContext("2d").drawImage(img, 0, 0, img.width, img.height);
+				// let pixelData = canvas.getContext("2d").getImageData(x, y, 1, 1).data;
+				// pixelData == [R, G, B, A];
+				*/
+
+				// let canvas = S.getTag("canvas")[0];
+				// let context = canvas.getContext("2d");
+				// context.fillStyle = "red";
+				// context.fillRect(50, 50, 50, 50);
+				/*
+				S.forEach(75000, function () {
+					context.fillRect(Math.random() * 499, Math.random() * 399, 1, 1);
+				});
+				*/
+				G.container = S.getTag("canvas")[0];
+
+				let square = new G.Character([175, 150]);
+
+				setInterval(function () {
+					square.move(0);
+					createStereogram([
+						{ shape: "square", coords: { x: square.position.x, y: square.position.y }, width: 50, height: 50 }
+					]);
+                }, G.refreshInterval);
+
+				document.body.addEventListener("keydown", function (event) {
+					if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.key)) {
+						event.preventDefault();
+						switch (event.key) {
+							case "ArrowUp":
+								square.velocity.y = -50;
+								break;
+                            case "ArrowDown":
+                                square.velocity.y = 50;
+								break;
+                            case "ArrowLeft":
+                                square.velocity.x = -50;
+								break;
+                            case "ArrowRight":
+                                square.velocity.x = 50;
+								break;
+						}
+					}
+                });
+                document.body.addEventListener("keyup", function (event) {
+                    if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.key)) {
+                        event.preventDefault();
+                        switch (event.key) {
+                            case "ArrowUp":
+                            case "ArrowDown":
+                                square.velocity.y = 0;
+                                break;
+                            case "ArrowLeft":
+                            case "ArrowRight":
+                                square.velocity.x = 0;
+                                break;
+                        }
+                    }
+                });
+			});
+		</script>
+        <link rel="stylesheet" href="https://epicenterprograms.github.io/standards/formatting/foundation.css">
+        <link rel="stylesheet" href="https://epicenterprograms.github.io/standards/formatting/game.css">
+		<!--
+        <link rel="stylesheet" href="file:///C:/Users/rtben/Documents/GitHub/standards/formatting/foundation.css">
+        <link rel="stylesheet" href="file:///C:/Users/rtben/Documents/GitHub/standards/formatting/game.css">
+		-->
+		<style>
+			canvas {
+				display: block;
+				margin: auto;
+				background: white;
+			}
+		</style>
+	</head>
+	<body>
+		<h1 class="main-title">
+			Stereogram generator
+		</h1>
+		<main>
+			<canvas width="500" height="300"></canvas>
+			<button id="createStereogram" disabled>
+				Create
+			</button>
+			<canvas id="depthMap" width="350" height="300"></canvas>
+		</main>
+	</body>
+</html>
