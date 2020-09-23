@@ -48,7 +48,7 @@
 					switch (objects[index].shape) {
 						case "square":
 							let startingX = Math.max(objects[index].coords.x + repeat - objects[index].width / 2, repeat);
-                            let endingX = Math.min(objects[index].coords.x + repeat + objects[index].width / 2, width);
+                            let endingX = Math.min(objects[index].coords.x + repeat + objects[index].width / 2, width + repeat * 2);
 							y = Math.max(objects[index].coords.y - objects[index].height / 2, 0);
 							let endingY = Math.min(objects[index].coords.y + objects[index].height / 2, height);
                             while (y < endingY) {
@@ -231,7 +231,7 @@
 				*/
 				G.container = S.getTag("canvas")[0];
 
-				let square = new G.Character([175, 150]);
+				let square = new G.Character([200, 150]);
 
 				setInterval(function () {
 					square.move(0);
@@ -273,7 +273,25 @@
                                 break;
                         }
                     }
-                });
+				});
+
+				let box = G.container.getBoundingClientRect();
+				S.listen(G.container, "mousedown", function (event) {
+					let pos = { x: event.clientX - box.left, y: event.clientY - box.top };  // cursor position within the canvas
+					if (pos.x < G.container.width / 3) {
+						square.velocity.x = -50;
+					} else if (pos.x > G.container.width * 2 / 3) {
+						square.velocity.x = 50;
+                    }
+                    if (pos.y < G.container.height / 3) {
+                        square.velocity.y = -50;
+                    } else if (pos.y > G.container.height * 2 / 3) {
+                        square.velocity.y = 50;
+                    }
+				});
+				S.listen(G.container, "mouseup", function () {
+					square.setVelocity(0, 0);
+				});
 			});
 		</script>
         <link rel="stylesheet" href="https://epicenterprograms.github.io/standards/formatting/foundation.css">
