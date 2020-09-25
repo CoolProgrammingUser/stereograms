@@ -293,7 +293,10 @@
 
 				let box = G.container.getBoundingClientRect();
 				S.listen(G.container, ["mousedown", "touchstart"], function (event) {
-					let pos = { x: event.clientX - box.left, y: event.clientY - box.top };  // cursor position within the canvas
+                    let pos = {  // cursor position within the canvas
+                        x: (event.clientX === undefined ? event.touches[0].clientX : event.clientX) - box.left,
+                        y: (event.clientY === undefined ? event.touches[0].clientY : event.clientY) - box.top
+					};
 					if (pos.x < G.container.width / 3) {
 						square.velocity.x = -50;
 					} else if (pos.x > G.container.width * 2 / 3) {
